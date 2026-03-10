@@ -1,34 +1,109 @@
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
 from app.main import app
 from app.db import get_conn
+from app import services
+
+
+class DummyCursor:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, *args, **kwargs):
+        return None
+
+    def fetchone(self):
+        return (1,)
+
+
+class DummyConn:
+    def cursor(self):
+        return DummyCursor()
+
+
+def override_conn():
+    return DummyConn()
+
 
 client = TestClient(app)
 
-def override_conn():
-    class DummyConn:
-        def cursor(self): raise RuntimeError("should not hit real DB in unit tests")
-    yield DummyConn()
 
-app.dependency_overrides[get_conn] = override_conn
+def setup_function():
+    app.dependency_overrides[get_conn] = override_conn
+
+
+def teardown_function():
+    app.dependency_overrides.clear()
+
+
+def test_health_ok():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "db": 1}
+
 
 def test_search_validation_param_missing():
-    r = client.get("/search")
-    assert r.status_code == 422
+    response = client.get("/search")
+    assert response.status_code == 422
 
-def test_search_ok_mocked():
-    with patch("app.services.search_tracks", return_value=[{"trackid":1,"track":"x","artist":"y","genre":"z","unitprice":0.99}]):
-        r = client.get("/search", params={"q":"x"})
-        assert r.status_code == 200
-        assert isinstance(r.json(), list)
+
+def test_search_ok_mocked(monkeypatch):
+    monkeypatch.setattr(
+        services,
+        "search_tracks",
+        lambda conn, q, limit: [
+            {"track_id": 1, "track": "Song", "artist": "Artist", "genre": "Rock", "price": 0.99}
+        ],
+    )
+    response = client.get("/search?q=rock")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["track"] == "Song"
+
 
 def test_purchase_validation():
-    r = client.post("/purchase", json={})
-    assert r.status_code == 400
+    response = client.post("/purchase", json={"customer_id": 1})
+    assert response.status_code == 400
 
-def test_purchase_ok_mocked():
-    with patch("app.services.purchase_track", return_value={"invoice_id": 123, "total": 1.98}):
-        r = client.post("/purchase", json={"customer_id":1, "track_id":2, "quantity":2})
-        assert r.status_code == 200
-        assert r.json()["invoice_id"] == 123
+
+def test_purchase_ok_mocked(monkeypatch):
+    monkeypatch.setattr(
+        services,
+        "purchase_track",
+        lambda conn, customer_id, track_id, quantity: {
+            "ok": True,
+            "invoice_id": 10,
+            "customer_id": customer_id,
+            "track_id": track_id,
+            "quantity": quantity,
+            "total": 0.99,
+        },
+    )
+    response = client.post(
+        "/purchase",
+        json={"customer_id": 1, "track_id": 2, "quantity": 1},
+    )
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+
+def test_customer_ok_mocked(monkeypatch):
+    monkeypatch.setattr(
+        services,
+        "get_customer_summary",
+        lambda conn, customer_id: {
+            "customer_id": 1,
+            "name": "Luis",
+            "email": "luis@example.com",
+            "country": "Brazil",
+            "total": 10.5,
+            "invoices": 2,
+        },
+    )
+    response = client.get("/customer/1")
+    assert response.status_code == 200
+    assert response.json()["customer_id"] == 1

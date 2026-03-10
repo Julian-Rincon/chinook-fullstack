@@ -1,14 +1,22 @@
 import os
-from psycopg import connect
+import psycopg
 from psycopg.rows import dict_row
 
+
+def _env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
 def get_conn():
-    conn = connect(
-        host=os.environ["DB_HOST"],
-        port=int(os.environ.get("DB_PORT", "5432")),
-        dbname=os.environ.get("DB_NAME", "chinook"),
-        user=os.environ["DB_USER"],
-        password=os.environ["DB_PASSWORD"],
+    conn = psycopg.connect(
+        host=_env("DB_HOST"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        dbname=_env("DB_NAME"),
+        user=_env("DB_USER"),
+        password=_env("DB_PASSWORD"),
         row_factory=dict_row,
     )
     try:
