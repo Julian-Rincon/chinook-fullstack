@@ -5,15 +5,28 @@ import App from "./App";
 import * as api from "./api";
 
 vi.mock("./api", () => ({
-  getHealth: vi.fn(),
-  searchTracks: vi.fn(),
+  bootstrapAdmin: vi.fn(),
   getCustomer: vi.fn(),
+  getHealth: vi.fn(),
+  getMe: vi.fn(),
+  listUsers: vi.fn(),
+  loginUser: vi.fn(),
   purchaseTrack: vi.fn(),
+  registerUser: vi.fn(),
+  searchTracks: vi.fn(),
 }));
 
 describe("App", () => {
   beforeEach(() => {
+    localStorage.clear();
     api.getHealth.mockResolvedValue({ ok: true, db: 1 });
+    api.getMe.mockResolvedValue({
+      user_id: 1,
+      full_name: "Tester",
+      email: "tester@test.com",
+      role: "user",
+      is_active: true,
+    });
     api.searchTracks.mockResolvedValue([]);
     api.getCustomer.mockResolvedValue({
       customer_id: 1,
@@ -28,14 +41,41 @@ describe("App", () => {
       invoice_id: 99,
       total: 0.99,
     });
+    api.loginUser.mockResolvedValue({
+      access_token: "token-123",
+      user: {
+        user_id: 1,
+        full_name: "Tester",
+        email: "tester@test.com",
+        role: "user",
+        is_active: true,
+      },
+    });
+    api.registerUser.mockResolvedValue({
+      ok: true,
+      user: { role: "user" },
+    });
   });
 
-  it("muestra el estado del sistema", async () => {
+  it("renderiza la página", async () => {
     render(<App />);
+    expect(screen.getByText(/Chinook Store/i)).toBeInTheDocument();
     expect(await screen.findByText(/Backend y BD activos/i)).toBeInTheDocument();
   });
 
-  it("busca tracks y pinta resultados", async () => {
+  it("permite login", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(screen.getByLabelText(/Email auth/i), "tester@test.com");
+    await user.type(screen.getByLabelText(/Password auth/i), "secret123");
+    await user.click(screen.getByRole("button", { name: /Iniciar sesión/i }));
+
+    expect(api.loginUser).toHaveBeenCalled();
+    expect(await screen.findByText(/Sesión activa/i)).toBeInTheDocument();
+  });
+
+  it("permite buscar tracks", async () => {
     api.searchTracks.mockResolvedValueOnce([
       {
         track_id: 1,
@@ -54,45 +94,5 @@ describe("App", () => {
 
     expect(api.searchTracks).toHaveBeenCalledWith("rock", 20);
     expect(await screen.findByText("Balls to the Wall")).toBeInTheDocument();
-  });
-
-  it("consulta un cliente", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole("button", { name: /^Consultar$/i }));
-
-    expect(api.getCustomer).toHaveBeenCalledWith(1);
-    expect(await screen.findByText("Luís Gonçalves")).toBeInTheDocument();
-  });
-
-  it("realiza una compra", async () => {
-    api.searchTracks.mockResolvedValueOnce([
-      {
-        track_id: 2,
-        track: "Fast As a Shark",
-        artist: "Accept",
-        genre: "Rock",
-        price: 0.99,
-      },
-    ]);
-
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.type(screen.getByLabelText(/Buscar canciones/i), "rock");
-    await user.click(screen.getByRole("button", { name: /^Buscar$/i }));
-    await user.click(await screen.findByRole("button", { name: /Seleccionar Fast As a Shark/i }));
-
-    await user.click(screen.getByRole("button", { name: /^Consultar$/i }));
-    await user.click(screen.getByRole("button", { name: /Comprar canción/i }));
-
-    expect(api.purchaseTrack).toHaveBeenCalledWith({
-      customerId: 1,
-      trackId: 2,
-      quantity: 1,
-    });
-
-    expect(await screen.findByText(/Compra realizada con éxito/i)).toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.db import get_conn
 from app import services
+import app.main as mainmod
 
 
 class DummyCursor:
@@ -22,6 +23,9 @@ class DummyCursor:
 class DummyConn:
     def cursor(self):
         return DummyCursor()
+
+    def commit(self):
+        return None
 
 
 def override_conn():
@@ -65,32 +69,6 @@ def test_search_ok_mocked(monkeypatch):
     assert data[0]["track"] == "Song"
 
 
-def test_purchase_validation():
-    response = client.post("/purchase", json={"customer_id": 1})
-    assert response.status_code == 400
-
-
-def test_purchase_ok_mocked(monkeypatch):
-    monkeypatch.setattr(
-        services,
-        "purchase_track",
-        lambda conn, customer_id, track_id, quantity: {
-            "ok": True,
-            "invoice_id": 10,
-            "customer_id": customer_id,
-            "track_id": track_id,
-            "quantity": quantity,
-            "total": 0.99,
-        },
-    )
-    response = client.post(
-        "/purchase",
-        json={"customer_id": 1, "track_id": 2, "quantity": 1},
-    )
-    assert response.status_code == 200
-    assert response.json()["ok"] is True
-
-
 def test_customer_ok_mocked(monkeypatch):
     monkeypatch.setattr(
         services,
@@ -107,3 +85,43 @@ def test_customer_ok_mocked(monkeypatch):
     response = client.get("/customer/1")
     assert response.status_code == 200
     assert response.json()["customer_id"] == 1
+
+
+def test_purchase_requires_auth():
+    response = client.post("/purchase", json={"customer_id": 1, "track_id": 2, "quantity": 1})
+    assert response.status_code == 401
+
+
+def test_purchase_ok_mocked(monkeypatch):
+    monkeypatch.setattr(
+        mainmod,
+        "get_user_by_id",
+        lambda conn, user_id: {
+            "user_id": 1,
+            "full_name": "User",
+            "email": "user@test.com",
+            "password_hash": "x",
+            "role": "user",
+            "is_active": True,
+        },
+    )
+    monkeypatch.setattr(
+        services,
+        "purchase_track",
+        lambda conn, customer_id, track_id, quantity: {
+            "ok": True,
+            "invoice_id": 10,
+            "customer_id": customer_id,
+            "track_id": track_id,
+            "quantity": quantity,
+            "total": 0.99,
+        },
+    )
+    token = mainmod.create_access_token({"sub": "1", "role": "user"})
+    response = client.post(
+        "/purchase",
+        json={"customer_id": 1, "track_id": 2, "quantity": 1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["ok"] is True

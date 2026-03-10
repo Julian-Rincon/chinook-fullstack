@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { getCustomer, getHealth, purchaseTrack, searchTracks } from "./api";
+import {
+  bootstrapAdmin,
+  getCustomer,
+  getHealth,
+  getMe,
+  listUsers,
+  loginUser,
+  purchaseTrack,
+  registerUser,
+  searchTracks,
+} from "./api";
 
 const SAMPLE_TERMS = ["rock", "jazz", "queen", "metal", "blues"];
+const TOKEN_KEY = "chinook_token";
 
 function formatUsd(value) {
   const amount = Number(value);
@@ -33,6 +44,22 @@ export default function App() {
   const [purchaseError, setPurchaseError] = useState("");
   const [purchaseSuccess, setPurchaseSuccess] = useState("");
 
+  const [token, setToken] = useState(localStorage.getItem(TOKEN_KEY) || "");
+  const [authUser, setAuthUser] = useState(null);
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+  });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authSuccess, setAuthSuccess] = useState("");
+
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState("");
+
   useEffect(() => {
     const loadHealth = async () => {
       try {
@@ -42,9 +69,90 @@ export default function App() {
         setHealth({ loading: false, ok: false, db: null });
       }
     };
-
     loadHealth();
   }, []);
+
+  useEffect(() => {
+    const loadSession = async () => {
+      if (!token) {
+        setAuthUser(null);
+        return;
+      }
+
+      try {
+        const me = await getMe(token);
+        setAuthUser(me);
+      } catch {
+        localStorage.removeItem(TOKEN_KEY);
+        setToken("");
+        setAuthUser(null);
+      }
+    };
+
+    loadSession();
+  }, [token]);
+
+  const persistSession = (sessionToken, user) => {
+    localStorage.setItem(TOKEN_KEY, sessionToken);
+    setToken(sessionToken);
+    setAuthUser(user);
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    setToken("");
+    setAuthUser(null);
+    setAdminUsers([]);
+  };
+
+  const handleAuthSubmit = async () => {
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthSuccess("");
+
+    try {
+      if (!authForm.email.trim() || !authForm.password.trim()) {
+        throw new Error("Email y contraseña son obligatorios.");
+      }
+
+      if (authMode !== "login" && !authForm.fullName.trim()) {
+        throw new Error("El nombre completo es obligatorio.");
+      }
+
+      if (authMode === "login") {
+        const result = await loginUser({
+          email: authForm.email,
+          password: authForm.password,
+        });
+        persistSession(result.access_token, result.user);
+        setAuthSuccess("Sesión iniciada correctamente.");
+      }
+
+      if (authMode === "register") {
+        await registerUser({
+          fullName: authForm.fullName,
+          email: authForm.email,
+          password: authForm.password,
+        });
+        setAuthSuccess("Usuario registrado. Ahora inicia sesión.");
+        setAuthMode("login");
+      }
+
+      if (authMode === "bootstrap") {
+        const result = await bootstrapAdmin({
+          fullName: authForm.fullName,
+          email: authForm.email,
+          password: authForm.password,
+        });
+        persistSession(result.access_token, result.user);
+        setAuthSuccess("Admin creado e inicio de sesión exitoso.");
+      }
+    } catch (error) {
+      setAuthError(error.message || "No se pudo completar la autenticación.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const loadCustomer = async (idOverride = customerId) => {
     const parsedId = Number(String(idOverride).trim());
@@ -101,18 +209,17 @@ export default function App() {
     }
   };
 
-  const handleSelectTrack = (track) => {
-    setSelectedTrack(track);
-    setPurchaseError("");
-    setPurchaseSuccess("");
-  };
-
   const handlePurchase = async () => {
     const parsedCustomerId = Number(String(customerId).trim());
     const parsedQuantity = Number(String(quantity).trim());
 
     setPurchaseError("");
     setPurchaseSuccess("");
+
+    if (!authUser || !token) {
+      setPurchaseError("Debes iniciar sesión para comprar canciones.");
+      return;
+    }
 
     if (!selectedTrack) {
       setPurchaseError("Selecciona una canción antes de comprar.");
@@ -136,6 +243,7 @@ export default function App() {
         customerId: parsedCustomerId,
         trackId: selectedTrack.track_id,
         quantity: parsedQuantity,
+        token,
       });
 
       setPurchaseSuccess(
@@ -147,6 +255,20 @@ export default function App() {
       setPurchaseError(error.message || "No se pudo realizar la compra.");
     } finally {
       setPurchaseLoading(false);
+    }
+  };
+
+  const handleLoadUsers = async () => {
+    setAdminLoading(true);
+    setAdminError("");
+    try {
+      const data = await listUsers(token);
+      setAdminUsers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setAdminUsers([]);
+      setAdminError(error.message || "No se pudo consultar usuarios.");
+    } finally {
+      setAdminLoading(false);
     }
   };
 
@@ -171,8 +293,8 @@ export default function App() {
             <span className="badge">Chinook Fullstack</span>
             <h1>Chinook Store</h1>
             <p className="hero-text">
-              Busca canciones por texto, consulta clientes y realiza compras conectándote al backend
-              FastAPI y a PostgreSQL en AWS.
+              Busca canciones, consulta clientes, compra canciones con autenticación y gestiona roles
+              de usuario/admin sobre FastAPI + PostgreSQL en AWS.
             </p>
           </div>
 
@@ -184,6 +306,132 @@ export default function App() {
             <small>DB: {health.loading ? "..." : health.db ?? "—"}</small>
           </div>
         </header>
+
+        <section className="grid auth-layout">
+          <article className="card">
+            <div className="card-header">
+              <h2>Autenticación y roles</h2>
+              <p>Modo rápido para cumplir registro, login y roles admin/usuario.</p>
+            </div>
+
+            {!authUser ? (
+              <>
+                <div className="tab-row">
+                  <button
+                    className={`tab-btn ${authMode === "login" ? "active" : ""}`}
+                    onClick={() => setAuthMode("login")}
+                  >
+                    Login
+                  </button>
+                  <button
+                    className={`tab-btn ${authMode === "register" ? "active" : ""}`}
+                    onClick={() => setAuthMode("register")}
+                  >
+                    Registro usuario
+                  </button>
+                  <button
+                    className={`tab-btn ${authMode === "bootstrap" ? "active" : ""}`}
+                    onClick={() => setAuthMode("bootstrap")}
+                  >
+                    Crear primer admin
+                  </button>
+                </div>
+
+                <div className="form-stack">
+                  {authMode !== "login" && (
+                    <input
+                      aria-label="Nombre completo"
+                      type="text"
+                      placeholder="Nombre completo"
+                      value={authForm.fullName}
+                      onChange={(e) => setAuthForm({ ...authForm, fullName: e.target.value })}
+                    />
+                  )}
+
+                  <input
+                    aria-label="Email auth"
+                    type="email"
+                    placeholder="correo@ejemplo.com"
+                    value={authForm.email}
+                    onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                  />
+
+                  <input
+                    aria-label="Password auth"
+                    type="password"
+                    placeholder="Contraseña"
+                    value={authForm.password}
+                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                  />
+
+                  <button onClick={handleAuthSubmit} disabled={authLoading}>
+                    {authLoading
+                      ? "Procesando..."
+                      : authMode === "login"
+                        ? "Iniciar sesión"
+                        : authMode === "register"
+                          ? "Registrar usuario"
+                          : "Crear admin"}
+                  </button>
+                </div>
+
+                {authError && <div className="alert error">{authError}</div>}
+                {authSuccess && <div className="alert success">{authSuccess}</div>}
+              </>
+            ) : (
+              <>
+                <div className="session-box">
+                  <div>
+                    <strong>Sesión activa</strong>
+                    <p>{authUser.full_name}</p>
+                    <small>
+                      {authUser.email} · <strong>{authUser.role}</strong>
+                    </small>
+                  </div>
+                  <button onClick={clearSession}>Cerrar sesión</button>
+                </div>
+
+                {authUser.role === "admin" && (
+                  <div className="admin-panel">
+                    <div className="purchase-header">
+                      <h3>Panel admin</h3>
+                      <button onClick={handleLoadUsers} disabled={adminLoading}>
+                        {adminLoading ? "Cargando..." : "Cargar usuarios"}
+                      </button>
+                    </div>
+
+                    {adminError && <div className="alert error">{adminError}</div>}
+
+                    {adminUsers.length > 0 && (
+                      <div className="table-wrap">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>ID</th>
+                              <th>Nombre</th>
+                              <th>Email</th>
+                              <th>Rol</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {adminUsers.map((user) => (
+                              <tr key={user.user_id}>
+                                <td>{user.user_id}</td>
+                                <td>{user.full_name}</td>
+                                <td>{user.email}</td>
+                                <td>{user.role}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </article>
+        </section>
 
         <section className="grid two-col">
           <article className="card">
@@ -256,7 +504,7 @@ export default function App() {
                             <button
                               className="table-btn"
                               aria-label={`Seleccionar ${item.track}`}
-                              onClick={() => handleSelectTrack(item)}
+                              onClick={() => setSelectedTrack(item)}
                             >
                               {isSelected ? "Seleccionada" : "Seleccionar"}
                             </button>
@@ -293,8 +541,9 @@ export default function App() {
             <div className="hint-box">
               <strong>Cómo usar la página</strong>
               <ol>
+                <li>Inicia sesión como usuario o admin.</li>
                 <li>Busca una canción en la tabla de la izquierda.</li>
-                <li>Presiona <strong>Seleccionar</strong> en la canción que quieres comprar.</li>
+                <li>Presiona <strong>Seleccionar</strong>.</li>
                 <li>Consulta un cliente con <strong>Customer ID = 1</strong>.</li>
                 <li>Define la cantidad y presiona <strong>Comprar canción</strong>.</li>
               </ol>

@@ -21,6 +21,10 @@ async function parseResponse(response, fallbackMessage) {
   return payload;
 }
 
+function authHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function getHealth() {
   const response = await fetch("/api/health");
   return parseResponse(response, "No se pudo validar el estado del sistema.");
@@ -38,11 +42,12 @@ export async function getCustomer(customerId) {
   return parseResponse(response, "No se pudo consultar el cliente.");
 }
 
-export async function purchaseTrack({ customerId, trackId, quantity }) {
+export async function purchaseTrack({ customerId, trackId, quantity, token }) {
   const response = await fetch("/api/purchase", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(token),
     },
     body: JSON.stringify({
       customer_id: Number(customerId),
@@ -52,4 +57,53 @@ export async function purchaseTrack({ customerId, trackId, quantity }) {
   });
 
   return parseResponse(response, "No se pudo realizar la compra.");
+}
+
+export async function registerUser({ fullName, email, password }) {
+  const response = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      full_name: fullName,
+      email,
+      password,
+    }),
+  });
+  return parseResponse(response, "No se pudo registrar el usuario.");
+}
+
+export async function bootstrapAdmin({ fullName, email, password }) {
+  const response = await fetch("/api/auth/bootstrap-admin", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      full_name: fullName,
+      email,
+      password,
+    }),
+  });
+  return parseResponse(response, "No se pudo crear el admin.");
+}
+
+export async function loginUser({ email, password }) {
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  return parseResponse(response, "No se pudo iniciar sesión.");
+}
+
+export async function getMe(token) {
+  const response = await fetch("/api/auth/me", {
+    headers: authHeaders(token),
+  });
+  return parseResponse(response, "No se pudo consultar la sesión.");
+}
+
+export async function listUsers(token) {
+  const response = await fetch("/api/auth/admin/users", {
+    headers: authHeaders(token),
+  });
+  return parseResponse(response, "No se pudo consultar los usuarios.");
 }
