@@ -117,6 +117,7 @@ def test_purchase_ok_mocked(monkeypatch):
             "total": 0.99,
         },
     )
+
     token = mainmod.create_access_token({"sub": "1", "role": "user"})
     response = client.post(
         "/purchase",

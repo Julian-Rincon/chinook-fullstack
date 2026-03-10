@@ -52,24 +52,26 @@ def test_register_user(monkeypatch):
 
 
 def test_login_ok(monkeypatch):
-    password = "secret123"
     user_row = {
         "user_id": 2,
         "full_name": "Admin",
         "email": "admin@test.com",
-        "password_hash": mainmod.get_password_hash(password),
+        "password_hash": "fake-hash",
         "role": "admin",
         "is_active": True,
     }
+
     monkeypatch.setattr(mainmod, "get_user_by_email", lambda conn, email: user_row)
+    monkeypatch.setattr(mainmod, "verify_password", lambda plain, hashed: True)
 
     response = client.post(
         "/auth/login",
-        json={"email": "admin@test.com", "password": password},
+        json={"email": "admin@test.com", "password": "secret123"},
     )
     assert response.status_code == 200
-    assert "access_token" in response.json()
-    assert response.json()["user"]["role"] == "admin"
+    body = response.json()
+    assert "access_token" in body
+    assert body["user"]["role"] == "admin"
 
 
 def test_me_ok(monkeypatch):
@@ -132,5 +134,6 @@ def test_bootstrap_admin(monkeypatch):
         json={"full_name": "First Admin", "email": "firstadmin@test.com", "password": "secret123"},
     )
     assert response.status_code == 200
-    assert response.json()["user"]["role"] == "admin"
-    assert "access_token" in response.json()
+    body = response.json()
+    assert body["user"]["role"] == "admin"
+    assert "access_token" in body
