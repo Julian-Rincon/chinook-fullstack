@@ -1,13 +1,22 @@
+from decimal import Decimal
+
+
 def _rows_to_dicts(cur, rows):
-    columns = [desc[0] for desc in cur.description]
     result = []
+
     for row in rows:
-        item = dict(zip(columns, row))
-        if "price" in item and item["price"] is not None:
-            item["price"] = float(item["price"])
-        if "total" in item and item["total"] is not None:
-            item["total"] = float(item["total"])
+        if isinstance(row, dict):
+            item = dict(row)
+        else:
+            columns = [desc[0] for desc in cur.description]
+            item = dict(zip(columns, row))
+
+        for key in ("price", "total"):
+            if key in item and isinstance(item[key], Decimal):
+                item[key] = float(item[key])
+
         result.append(item)
+
     return result
 
 
@@ -97,6 +106,15 @@ def purchase_track(conn, customer_id: int, track_id: int, quantity: int = 1):
             if not customer:
                 raise ValueError("customer not found")
 
+            if isinstance(customer, dict):
+                address = customer["address"]
+                city = customer["city"]
+                state = customer["state"]
+                country = customer["country"]
+                postal_code = customer["postal_code"]
+            else:
+                address, city, state, country, postal_code = customer
+
             cur.execute(
                 """
                 SELECT name, unit_price
@@ -109,13 +127,18 @@ def purchase_track(conn, customer_id: int, track_id: int, quantity: int = 1):
             if not track:
                 raise ValueError("track not found")
 
-            address, city, state, country, postal_code = customer
-            track_name, unit_price = track
-            unit_price = float(unit_price)
+            if isinstance(track, dict):
+                track_name = track["name"]
+                unit_price = float(track["unit_price"])
+            else:
+                track_name, unit_price = track
+                unit_price = float(unit_price)
+
             total = unit_price * quantity
 
-            cur.execute("SELECT COALESCE(MAX(invoice_id), 0) + 1 FROM invoice")
-            invoice_id = cur.fetchone()[0]
+            cur.execute("SELECT COALESCE(MAX(invoice_id), 0) + 1 AS next_id FROM invoice")
+            invoice_id_row = cur.fetchone()
+            invoice_id = invoice_id_row["next_id"] if isinstance(invoice_id_row, dict) else invoice_id_row[0]
 
             cur.execute(
                 """
@@ -144,8 +167,9 @@ def purchase_track(conn, customer_id: int, track_id: int, quantity: int = 1):
                 ),
             )
 
-            cur.execute("SELECT COALESCE(MAX(invoice_line_id), 0) + 1 FROM invoice_line")
-            invoice_line_id = cur.fetchone()[0]
+            cur.execute("SELECT COALESCE(MAX(invoice_line_id), 0) + 1 AS next_id FROM invoice_line")
+            invoice_line_id_row = cur.fetchone()
+            invoice_line_id = invoice_line_id_row["next_id"] if isinstance(invoice_line_id_row, dict) else invoice_line_id_row[0]
 
             cur.execute(
                 """
@@ -171,14 +195,14 @@ def purchase_track(conn, customer_id: int, track_id: int, quantity: int = 1):
 
         return {
             "ok": True,
-            "invoice_id": invoice_id,
-            "invoice_line_id": invoice_line_id,
+            "invoice_id": int(invoice_id),
+            "invoice_line_id": int(invoice_line_id),
             "customer_id": int(customer_id),
             "track_id": int(track_id),
             "track": track_name,
-            "quantity": quantity,
-            "unit_price": unit_price,
-            "total": total,
+            "quantity": int(quantity),
+            "unit_price": float(unit_price),
+            "total": float(total),
         }
     except Exception:
         conn.rollback()
