@@ -57,6 +57,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [test-backend, build-frontend]
+
+    # 👇 ESTO ES LO CLAVE para que se apliquen las "protection rules" del Environment
+    environment:
+      name: production
+      url: http://${{ secrets.FRONTEND_HOST }}
+
     steps:
       - uses: actions/checkout@v4
 
