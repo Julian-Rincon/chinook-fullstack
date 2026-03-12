@@ -80,8 +80,12 @@ def purchase_track(conn, customer_id: int, track_id: int, quantity: int = 1):
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT customer_id, billing_address, billing_city, billing_state,
-                   billing_country, billing_postal_code
+            SELECT customer_id,
+                   address AS billing_address,
+                   city AS billing_city,
+                   state AS billing_state,
+                   country AS billing_country,
+                   postal_code AS billing_postal_code
             FROM customer
             WHERE customer_id = %(customer_id)s
             """,
