@@ -59,6 +59,7 @@ describe("App", () => {
 
   it("renderiza la página", async () => {
     render(<App />);
+    //xd
     expect(screen.getByText(/Chinook Store/i)).toBeInTheDocument();
     expect(await screen.findByText(/Backend y BD activos/i)).toBeInTheDocument();
   });
