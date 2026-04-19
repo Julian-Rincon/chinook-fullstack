@@ -100,7 +100,7 @@ jobs:
           ssh-keyscan -H "${{ secrets.BACKEND_HOST }}" >> ~/.ssh/known_hosts || true
           ssh-keyscan -H "${{ secrets.FRONTEND_HOST }}" >> ~/.ssh/known_hosts || true
 
-      - name: Temporary Diagnostics: Hosted Runner Reachability
+      - name: "Temporary Diagnostics: Hosted Runner Reachability"
         shell: bash
         continue-on-error: true
         run: |
