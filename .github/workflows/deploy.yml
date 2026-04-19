@@ -109,17 +109,9 @@ jobs:
             echo "::group::temporary-diag ${host}"
             resolved="$(getent ahostsv4 "$host" | awk '{print $1}' | sort -u | paste -sd ',' - || true)"
             echo "dns=${resolved:-unresolved}"
-            python - "$host" <<'PY'
-import socket
-import sys
-
-host = sys.argv[1]
-try:
-    with socket.create_connection((host, 22), timeout=5):
-        print("tcp22=reachable")
-except Exception as exc:
-    print(f"tcp22=unreachable:{type(exc).__name__}:{exc}")
-PY
+            python -c "import socket,sys; host=sys.argv[1]; \
+try: socket.create_connection((host,22),timeout=5).close(); print('tcp22=reachable') \
+except Exception as exc: print(f'tcp22=unreachable:{type(exc).__name__}:{exc}')" "$host"
             echo "::endgroup::"
           done
 
