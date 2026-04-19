@@ -95,9 +95,10 @@ jobs:
           printf '%s' "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # Trust the backend and frontend hosts for non-interactive SSH/rsync.
-          ssh-keyscan -H "${{ secrets.BACKEND_HOST }}" >> ~/.ssh/known_hosts
-          ssh-keyscan -H "${{ secrets.FRONTEND_HOST }}" >> ~/.ssh/known_hosts
+          # Try to pre-populate known_hosts, but do not fail the whole workflow
+          # if a host-key scan is temporarily unavailable from the runner.
+          ssh-keyscan -H "${{ secrets.BACKEND_HOST }}" >> ~/.ssh/known_hosts || true
+          ssh-keyscan -H "${{ secrets.FRONTEND_HOST }}" >> ~/.ssh/known_hosts || true
 
       - name: Upload backend app and repo-managed scripts
         shell: bash
@@ -105,9 +106,9 @@ jobs:
           set -euo pipefail
           # Copy the backend source and the infra folder directly from the repo.
           # The deployment scripts live in the repository, not on the server.
-          rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
+          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
             backend/ "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}:/tmp/chinook/backend/"
-          rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
+          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
             infra/ "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}:/tmp/chinook/infra/"
 
       - name: Upload frontend artifact and repo-managed scripts
@@ -116,9 +117,9 @@ jobs:
           set -euo pipefail
           # Copy the built frontend artifact plus the infra folder to the
           # frontend EC2. Nginx will serve the artifact from /var/www/chinook.
-          rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
+          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
             frontend/dist/ "${{ secrets.SSH_USER }}@${{ secrets.FRONTEND_HOST }}:/tmp/chinook/frontend-dist/"
-          rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
+          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
             infra/ "${{ secrets.SSH_USER }}@${{ secrets.FRONTEND_HOST }}:/tmp/chinook/infra/"
 
       - name: Deploy backend
@@ -128,7 +129,7 @@ jobs:
 
           # Run the backend deployment script that came from this repository.
           # No /usr/local/bin server-side script is assumed.
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}" \
+          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}" \
             "sudo /bin/bash /tmp/chinook/infra/scripts/deploy_backend.sh"
 
       - name: Deploy frontend
@@ -138,7 +139,7 @@ jobs:
 
           # The frontend deploy script renders the Nginx config using the
           # backend private URL and the public frontend server name.
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.FRONTEND_HOST }}" \
+          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.FRONTEND_HOST }}" \
             "sudo BACKEND_UPSTREAM='${{ secrets.BACKEND_UPSTREAM }}' SERVER_NAME='${{ secrets.FRONTEND_SERVER_NAME }}' /bin/bash /tmp/chinook/infra/scripts/deploy_frontend.sh"
 
       - name: Smoke test backend health from backend host
@@ -147,7 +148,7 @@ jobs:
           set -euo pipefail
 
           # Validate the backend service directly on its native FastAPI route.
-          ssh -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}" \
+          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}" \
             "bash /tmp/chinook/infra/scripts/smoke_test.sh http://127.0.0.1:8000 /health"
 
       - name: Smoke test public frontend path
