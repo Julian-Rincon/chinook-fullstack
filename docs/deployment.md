@@ -172,7 +172,7 @@ The GitHub Actions workflow requires these secrets:
 - `SSH_PRIVATE_KEY_B64`
 - `SSH_USER`
 - `FRONTEND_HOST`
-- `BACKEND_PRIVATE_IP`
+- `BACKEND_PRIVATE_IP` preferred
 - `FRONTEND_SERVER_NAME`
 - `FRONTEND_BASE_URL`
 
@@ -187,6 +187,11 @@ Meaning of the deployment secrets:
 - `FRONTEND_BASE_URL`
   - public URL used for the final smoke test
   - example: `http://ec2-xx-xx-xx-xx.compute-1.amazonaws.com`
+
+Compatibility note:
+
+- if the repository already has `BACKEND_UPSTREAM=http://10.0.2.15:8000`, the workflow can derive the backend private IP from that existing secret
+- adding `BACKEND_PRIVATE_IP` is still cleaner because it separates SSH targeting from Nginx upstream rendering
 
 Do not store real credentials in the repository.
 
@@ -396,6 +401,9 @@ The workflow uses `BACKEND_PRIVATE_IP` in two ways:
 
 - as the backend SSH target behind the frontend bastion
 - to build `BACKEND_UPSTREAM=http://BACKEND_PRIVATE_IP:8000` for the frontend deploy step
+
+If `BACKEND_PRIVATE_IP` is not set yet, the workflow falls back to parsing the
+host portion from the existing `BACKEND_UPSTREAM` secret.
 
 ## 11. Update Deployment Steps
 

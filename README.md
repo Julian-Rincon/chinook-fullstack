@@ -171,9 +171,12 @@ Required GitHub repository secrets after this change:
 - `SSH_PRIVATE_KEY_B64`
 - `SSH_USER`
 - `FRONTEND_HOST`
-- `BACKEND_PRIVATE_IP`
+- `BACKEND_PRIVATE_IP` preferred
 - `FRONTEND_SERVER_NAME`
 - `FRONTEND_BASE_URL`
+
+If `BACKEND_UPSTREAM` already exists in the repository secrets, the workflow can
+also derive the private IP from that value as a compatibility fallback.
 
 For the complete deployment procedure, see
 [docs/deployment.md](docs/deployment.md).

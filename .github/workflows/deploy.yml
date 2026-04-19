@@ -82,6 +82,28 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
+      - name: Resolve backend private IP
+        id: backend_target
+        shell: bash
+        run: |
+          set -euo pipefail
+          BACKEND_PRIVATE_IP="${{ secrets.BACKEND_PRIVATE_IP }}"
+
+          if [[ -z "${BACKEND_PRIVATE_IP}" ]]; then
+            BACKEND_PRIVATE_IP="${{ secrets.BACKEND_UPSTREAM }}"
+            BACKEND_PRIVATE_IP="${BACKEND_PRIVATE_IP#http://}"
+            BACKEND_PRIVATE_IP="${BACKEND_PRIVATE_IP#https://}"
+            BACKEND_PRIVATE_IP="${BACKEND_PRIVATE_IP%%/*}"
+            BACKEND_PRIVATE_IP="${BACKEND_PRIVATE_IP%%:*}"
+          fi
+
+          if [[ -z "${BACKEND_PRIVATE_IP}" ]]; then
+            echo "Missing BACKEND_PRIVATE_IP and BACKEND_UPSTREAM secrets." >&2
+            exit 1
+          fi
+
+          echo "backend_private_ip=${BACKEND_PRIVATE_IP}" >> "${GITHUB_OUTPUT}"
+
       - name: Prepare SSH key, config, and known hosts
         shell: bash
         run: |
@@ -101,7 +123,7 @@ jobs:
             ServerAliveInterval 30
 
           Host backend-target
-            HostName ${{ secrets.BACKEND_PRIVATE_IP }}
+            HostName ${{ steps.backend_target.outputs.backend_private_ip }}
             User ${{ secrets.SSH_USER }}
             IdentityFile ~/.ssh/id_ed25519
             IdentitiesOnly yes
@@ -145,7 +167,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh frontend-target \
-            "sudo BACKEND_UPSTREAM='http://${{ secrets.BACKEND_PRIVATE_IP }}:8000' SERVER_NAME='${{ secrets.FRONTEND_SERVER_NAME }}' /bin/bash /tmp/chinook/infra/scripts/deploy_frontend.sh"
+            "sudo BACKEND_UPSTREAM='http://${{ steps.backend_target.outputs.backend_private_ip }}:8000' SERVER_NAME='${{ secrets.FRONTEND_SERVER_NAME }}' /bin/bash /tmp/chinook/infra/scripts/deploy_frontend.sh"
 
       - name: Smoke test backend health through frontend jump host
         shell: bash
