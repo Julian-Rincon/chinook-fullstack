@@ -11,11 +11,18 @@ from pydantic import BaseModel, EmailStr, Field
 from .db import get_conn, init_app_tables
 from . import services
 
+
+def parse_cors_origins(value: str | None) -> list[str]:
+    if not value:
+        return ["*"]
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+
 app = FastAPI(title="Chinook API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=parse_cors_origins(os.getenv("CORS_ALLOW_ORIGINS")),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

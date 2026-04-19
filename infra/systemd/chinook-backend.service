@@ -1,0 +1,19 @@
+[Unit]
+Description=Chinook FastAPI backend
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/chinook/backend
+EnvironmentFile=/etc/chinook/backend.env
+# Listen on the instance network so the frontend EC2 can reach the API on the
+# backend instance's private address. Security groups should still restrict
+# access to port 8000 to the frontend EC2 only.
+ExecStart=/opt/chinook/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

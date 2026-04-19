@@ -1,0 +1,13 @@
+region                 = "us-east-1"
+frontend_instance_type = "t3.micro"
+backend_instance_type  = "t3.micro"
+key_pair_name          = "your-existing-aws-keypair-name"
+
+# Restrict SSH to your administrator IP or campus/home network if possible.
+admin_cidr_blocks = [
+  "203.0.113.10/32"
+]
+
+db_name     = "chinook"
+db_username = "chinook_admin"
+db_password = "replace-me-with-a-secure-password"

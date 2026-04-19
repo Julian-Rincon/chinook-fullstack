@@ -3,11 +3,26 @@ __pycache__/
 *.pyc
 .venv/
 .env
+.pytest_cache/
+.coverage
 
 # Node
 node_modules/
 dist/
 build/
+coverage/
 
 # OS
 .DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!.terraform.tfvars.example
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
