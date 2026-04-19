@@ -146,14 +146,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Validate that the backend service is responding on the backend EC2.
+          # Validate the backend service directly on its native FastAPI route.
           ssh -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}" \
-            "bash /tmp/chinook/infra/scripts/smoke_test.sh http://127.0.0.1:8000"
+            "bash /tmp/chinook/infra/scripts/smoke_test.sh http://127.0.0.1:8000 /health"
 
       - name: Smoke test public frontend path
         shell: bash
         run: |
           set -euo pipefail
 
-          # Validate the final user-facing deployment path through Nginx.
-          curl -fsS "${{ secrets.FRONTEND_BASE_URL }}/api/health"
+          # Validate the final user-facing path through Nginx, which exposes the
+          # backend health route under /api/health.
+          bash infra/scripts/smoke_test.sh "${{ secrets.FRONTEND_BASE_URL }}" /api/health

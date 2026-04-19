@@ -16,11 +16,11 @@ fi
 # It is safe to re-run: packages are re-checked, directories are recreated if
 # missing, and the systemd unit is reinstalled from the repo-managed file.
 
-# Install the system packages required to run a Python 3.12 FastAPI service and
-# deploy code with rsync. build-essential and libpq-dev cover common Python
-# package compilation and PostgreSQL client headers if needed later.
+# Install the system packages required to run a Python 3.12 FastAPI service,
+# deploy code with rsync, and initialize PostgreSQL from the backend host.
+# `postgresql-client` provides the `psql` command used by infra/db/init_chinook.sh.
 apt-get update
-apt-get install -y software-properties-common curl rsync build-essential libpq-dev
+apt-get install -y software-properties-common curl rsync build-essential libpq-dev postgresql-client
 
 # Ubuntu 24.04 already includes Python 3.12. On older images this adds the PPA
 # only if python3.12 is not yet available.

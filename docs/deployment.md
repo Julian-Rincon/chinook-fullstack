@@ -106,7 +106,8 @@ The database remains private in private subnets.
 This model ensures:
 
 - the frontend is public
-- the backend is private except for frontend-to-backend traffic
+- the backend instance is SSH-accessible in a public subnet for a simple demo setup
+- backend application traffic on port `8000` is restricted to the frontend EC2 security group
 - the database is private except for backend-to-database traffic
 
 ## 6. Terraform Files
@@ -152,7 +153,7 @@ Optional but recommended variables:
 - `SKIP_DB_INIT`
 - `CORS_ALLOW_ORIGINS`
 
-See [backend/.env.example](/C:/Users/jrinc/chinook-fullstack/backend/.env.example) for the template. After
+See [backend/.env.example](../backend/.env.example) for the template. After
 Terraform runs, `DB_HOST` should use the `rds_endpoint` output value.
 
 ## 9. Required GitHub Secrets
@@ -163,20 +164,21 @@ The GitHub Actions workflow requires these secrets:
 - `SSH_USER`
 - `BACKEND_HOST`
 - `FRONTEND_HOST`
+- `BACKEND_UPSTREAM`
+- `FRONTEND_SERVER_NAME`
+- `FRONTEND_BASE_URL`
 
-Additional recommended secrets for a complete deployment workflow:
+Meaning of the deployment secrets:
 
 - `BACKEND_UPSTREAM`
   - private backend URL used by Nginx on the frontend EC2
-  - example: `http://10.0.1.25:8000`
+  - example: `http://10.0.2.15:8000`
 - `FRONTEND_SERVER_NAME`
   - server name written into the Nginx site config
   - example: `app.example.com`
 - `FRONTEND_BASE_URL`
-  - public URL used for smoke tests
+  - public URL used for the final smoke test
   - example: `http://ec2-xx-xx-xx-xx.compute-1.amazonaws.com`
-- `BACKEND_ENV_FILE`
-  - optional multi-line backend env file content if you want CI/CD to install it automatically
 
 Do not store real credentials in the repository.
 
@@ -255,6 +257,7 @@ sudo bash /tmp/chinook/infra/scripts/bootstrap_backend_server.sh
 This script:
 
 - installs Python 3.12 and deployment tools
+- installs `psql` through `postgresql-client` so database initialization works from the backend host
 - creates `/opt/chinook/backend`
 - creates `/etc/chinook`
 - installs the `systemd` service definition
@@ -284,11 +287,17 @@ ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@BACKEND_IP
 sudo nano /etc/chinook/backend.env
 ```
 
-Populate it using the values from [backend/.env.example](/C:/Users/jrinc/chinook-fullstack/backend/.env.example).
+Populate it using the values from [backend/.env.example](../backend/.env.example).
 Use:
 
 - `DB_HOST` = Terraform `rds_endpoint`
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD` = your Terraform DB variables
+
+Important:
+
+- the current GitHub Actions workflow does **not** create or upload `/etc/chinook/backend.env`
+- create this file manually during the first-time setup
+- later deployments assume the file already exists on the backend EC2
 
 ### Step 8: Initialize The Chinook Database
 
@@ -301,6 +310,7 @@ official PostgreSQL asset from the `lerocha/chinook-database` release `v1.4.5`.
 Recommended place to run this:
 
 - on the backend EC2 instance after bootstrap
+- this is practical because the backend host can reach the private RDS instance and now includes `psql`
 
 Download the SQL first:
 
@@ -310,12 +320,12 @@ bash infra/db/download_chinook_postgres.sh
 
 Then initialize the database:
 
-```powershell
-$env:DB_HOST="YOUR_RDS_ENDPOINT"
-$env:DB_PORT="5432"
-$env:DB_NAME="chinook"
-$env:DB_USER="chinook_admin"
-$env:DB_PASSWORD="replace-me"
+```bash
+export DB_HOST="YOUR_RDS_ENDPOINT"
+export DB_PORT="5432"
+export DB_NAME="chinook"
+export DB_USER="chinook_admin"
+export DB_PASSWORD="replace-me"
 bash infra/db/init_chinook.sh
 ```
 
@@ -367,9 +377,12 @@ build, upload, deploy, and smoke test steps on future pushes.
 
 Recommended mapping:
 
+- `SSH_PRIVATE_KEY_B64` = base64-encoded private key used by GitHub Actions for SSH
+- `SSH_USER` = SSH username for both EC2 instances, for example `ubuntu`
 - `BACKEND_HOST` = backend public IP or DNS from Terraform
 - `FRONTEND_HOST` = frontend public IP or DNS from Terraform
 - `BACKEND_UPSTREAM` = backend private IP from Terraform, for example `http://10.0.2.15:8000`
+- `FRONTEND_SERVER_NAME` = public hostname used in the Nginx config, or `_` if no custom domain is used yet
 - `FRONTEND_BASE_URL` = frontend public URL
 
 ## 11. Update Deployment Steps
@@ -418,6 +431,7 @@ Use this checklist before presenting or submitting the project:
 - frontend build succeeds
 - backend service is active in `systemctl`
 - Nginx configuration passes `nginx -t`
+- backend direct health check succeeds on `/health`
 - frontend is reachable from the browser
 - `/api/health` responds successfully through the frontend host
 - backend connects to RDS successfully

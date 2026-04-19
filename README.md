@@ -27,6 +27,15 @@ Role of each component:
 - Nginx also reverse proxies `/api/*` requests from the frontend host to the backend EC2 private address
 - Amazon RDS stores application data and is reachable only from the backend EC2
 
+In the current Terraform design, both EC2 instances receive public IPs so they
+can be administered directly over SSH in a simple student setup. Application
+traffic is still layered correctly:
+
+- users access the frontend EC2 on Nginx
+- Nginx forwards API traffic to the backend EC2 private IP
+- security groups restrict backend port `8000` to the frontend security group
+- RDS remains private and is not publicly accessible
+
 ## Backend And Frontend Roles
 
 Backend responsibilities:
@@ -136,4 +145,4 @@ This separation is intentional:
 - GitHub Actions handles ongoing delivery, not infrastructure creation on every push
 
 For the complete deployment procedure, see
-[docs/deployment.md](/C:/Users/jrinc/chinook-fullstack/docs/deployment.md).
+[docs/deployment.md](docs/deployment.md).
