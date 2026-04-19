@@ -315,7 +315,7 @@ Recommended place to run this:
 Download the SQL first:
 
 ```bash
-bash infra/db/download_chinook_postgres.sh
+bash /tmp/chinook/infra/db/download_chinook_postgres.sh
 ```
 
 Then initialize the database:
@@ -326,7 +326,7 @@ export DB_PORT="5432"
 export DB_NAME="chinook"
 export DB_USER="chinook_admin"
 export DB_PASSWORD="replace-me"
-bash infra/db/init_chinook.sh
+bash /tmp/chinook/infra/db/init_chinook.sh
 ```
 
 Important:
@@ -363,7 +363,7 @@ Frontend:
 rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" frontend/dist/ ubuntu@FRONTEND_IP:/tmp/chinook/frontend-dist/
 rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
 ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@FRONTEND_IP
-sudo BACKEND_UPSTREAM=http://10.0.1.25:8000 SERVER_NAME=app.example.com \
+sudo BACKEND_UPSTREAM=http://10.0.2.15:8000 SERVER_NAME=app.example.com \
   bash /tmp/chinook/infra/scripts/deploy_frontend.sh
 ```
 
@@ -416,7 +416,7 @@ Frontend:
 rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" frontend/dist/ ubuntu@FRONTEND_IP:/tmp/chinook/frontend-dist/
 rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
 ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@FRONTEND_IP
-sudo BACKEND_UPSTREAM=http://10.0.1.25:8000 SERVER_NAME=app.example.com \
+sudo BACKEND_UPSTREAM=http://10.0.2.15:8000 SERVER_NAME=app.example.com \
   bash /tmp/chinook/infra/scripts/deploy_frontend.sh
 ```
 

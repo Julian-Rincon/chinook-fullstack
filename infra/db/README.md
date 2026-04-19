@@ -65,10 +65,10 @@ which is already allowed to reach RDS.
 
 ## Step 1: Download The Pinned Chinook SQL
 
-From the backend EC2 or from a machine that can reach the database:
+From the backend EC2 after `infra/` has been copied to `/tmp/chinook/infra`:
 
 ```bash
-bash infra/db/download_chinook_postgres.sh
+bash /tmp/chinook/infra/db/download_chinook_postgres.sh
 ```
 
 ## Step 2: Run The Initialization
@@ -81,7 +81,7 @@ export DB_PORT=5432
 export DB_NAME=chinook
 export DB_USER=chinook_admin
 export DB_PASSWORD=replace-me
-bash infra/db/init_chinook.sh
+bash /tmp/chinook/infra/db/init_chinook.sh
 ```
 
 ## What The Initialization Script Does
