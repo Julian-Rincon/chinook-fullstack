@@ -105,15 +105,25 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          for host in "${{ secrets.BACKEND_HOST }}" "${{ secrets.FRONTEND_HOST }}"; do
-            echo "::group::temporary-diag ${host}"
-            resolved="$(getent ahostsv4 "$host" | awk '{print $1}' | sort -u | paste -sd ',' - || true)"
-            echo "dns=${resolved:-unresolved}"
-            python -c "import socket,sys; host=sys.argv[1]; \
-try: socket.create_connection((host,22),timeout=5).close(); print('tcp22=reachable') \
-except Exception as exc: print(f'tcp22=unreachable:{type(exc).__name__}:{exc}')" "$host"
-            echo "::endgroup::"
-          done
+          echo "::group::temporary-diag backend"
+          echo -n "backend_dns="
+          getent ahostsv4 "${{ secrets.BACKEND_HOST }}" | awk '{print $1}' | sort -u | paste -sd ',' - || true
+          if timeout 5 bash -c "</dev/tcp/${{ secrets.BACKEND_HOST }}/22" >/dev/null 2>&1; then
+            echo "backend_tcp22=reachable"
+          else
+            echo "backend_tcp22=unreachable"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::temporary-diag frontend"
+          echo -n "frontend_dns="
+          getent ahostsv4 "${{ secrets.FRONTEND_HOST }}" | awk '{print $1}' | sort -u | paste -sd ',' - || true
+          if timeout 5 bash -c "</dev/tcp/${{ secrets.FRONTEND_HOST }}/22" >/dev/null 2>&1; then
+            echo "frontend_tcp22=reachable"
+          else
+            echo "frontend_tcp22=unreachable"
+          fi
+          echo "::endgroup::"
 
       - name: Upload backend app and repo-managed scripts
         shell: bash
