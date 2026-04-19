@@ -8,7 +8,7 @@ account using simple, auditable infrastructure:
 - 1 Ubuntu EC2 for the backend
 - 1 Ubuntu EC2 for the frontend and Nginx
 - 1 private Amazon RDS PostgreSQL instance
-- GitHub Actions for CI/CD
+- GitHub Actions on GitHub-hosted runners for CI/CD
 
 The design is intentionally straightforward so it can be defended clearly in an
 academic presentation.
@@ -65,6 +65,15 @@ The repository now separates the infrastructure flow into four stages:
 
 GitHub Actions is intentionally **not** used to create infrastructure on every
 push. Infrastructure is provisioned separately with Terraform.
+
+For this student AWS account, the deployment model deliberately avoids any
+solution that would require extra IAM-role design work or self-hosted runners.
+The final workflow uses:
+
+- GitHub-hosted `ubuntu-latest`
+- direct SSH from the runner to the frontend EC2
+- SSH jump-host access from the runner through the frontend EC2 to the backend private IP
+- the existing repo-managed deploy scripts
 
 ## 4. Required AWS Components
 
@@ -162,17 +171,16 @@ The GitHub Actions workflow requires these secrets:
 
 - `SSH_PRIVATE_KEY_B64`
 - `SSH_USER`
-- `BACKEND_HOST`
 - `FRONTEND_HOST`
-- `BACKEND_UPSTREAM`
+- `BACKEND_PRIVATE_IP`
 - `FRONTEND_SERVER_NAME`
 - `FRONTEND_BASE_URL`
 
 Meaning of the deployment secrets:
 
-- `BACKEND_UPSTREAM`
-  - private backend URL used by Nginx on the frontend EC2
-  - example: `http://10.0.2.15:8000`
+- `BACKEND_PRIVATE_IP`
+  - backend private IP used as the SSH target behind the frontend jump host
+  - example: `10.0.2.15`
 - `FRONTEND_SERVER_NAME`
   - server name written into the Nginx site config
   - example: `app.example.com`
@@ -379,11 +387,15 @@ Recommended mapping:
 
 - `SSH_PRIVATE_KEY_B64` = base64-encoded private key used by GitHub Actions for SSH
 - `SSH_USER` = SSH username for both EC2 instances, for example `ubuntu`
-- `BACKEND_HOST` = backend public IP or DNS from Terraform
 - `FRONTEND_HOST` = frontend public IP or DNS from Terraform
-- `BACKEND_UPSTREAM` = backend private IP from Terraform, for example `http://10.0.2.15:8000`
+- `BACKEND_PRIVATE_IP` = backend private IP from Terraform, for example `10.0.2.15`
 - `FRONTEND_SERVER_NAME` = public hostname used in the Nginx config, or `_` if no custom domain is used yet
 - `FRONTEND_BASE_URL` = frontend public URL
+
+The workflow uses `BACKEND_PRIVATE_IP` in two ways:
+
+- as the backend SSH target behind the frontend bastion
+- to build `BACKEND_UPSTREAM=http://BACKEND_PRIVATE_IP:8000` for the frontend deploy step
 
 ## 11. Update Deployment Steps
 
@@ -392,9 +404,10 @@ For a regular update after the servers are already bootstrapped:
 1. push code to the repository
 2. let GitHub Actions run backend tests
 3. let GitHub Actions run frontend tests and build
-4. let GitHub Actions upload staged files to the two EC2 instances
-5. let GitHub Actions execute the repo-managed deploy scripts remotely
-6. confirm the smoke tests pass
+4. let GitHub Actions upload the frontend artifact directly to the frontend EC2
+5. let GitHub Actions upload backend files through the frontend EC2 jump host to the backend private IP
+6. let GitHub Actions execute the repo-managed deploy scripts remotely
+7. confirm the smoke tests pass
 
 Terraform is not part of the normal update path unless you intentionally want to
 change infrastructure.
@@ -441,6 +454,7 @@ Use this checklist before presenting or submitting the project:
 - GitHub Actions workflow deploys only after tests pass
 - GitHub Actions is not recreating infrastructure on every push
 - deployment scripts come from the repository, not manual server-only scripts
+- the backend deployment path goes through the frontend bastion instead of a direct public SSH session from GitHub-hosted runners
 
 ## 13. Why This Deployment Is Defensible In Class
 
@@ -453,4 +467,5 @@ This delivery is easy to justify technically because:
 - the database is private by design
 - the Chinook database is initialized explicitly and can be audited
 - CI/CD is reproducible from version-controlled scripts
+- the deployment model fits the student-account constraints without self-hosted runners or IAM redesign
 - the deployment process is explicit, readable, and easy to demonstrate

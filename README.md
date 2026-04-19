@@ -118,7 +118,17 @@ This repository includes a deployment structure designed for:
 - Nginx as static server and reverse proxy
 - Terraform for infrastructure provisioning
 - PostgreSQL on Amazon RDS with public access disabled
-- GitHub Actions for test, build, artifact handling, and deployment over SSH
+- GitHub Actions on `ubuntu-latest` for tests, build, and deployment
+- direct deployment to the frontend EC2 over SSH
+- backend deployment over SSH through the frontend EC2 as a jump host
+
+This deployment model is intentionally aligned with the current student-account
+constraints:
+
+- no self-hosted runners
+- no extra IAM role or instance-profile redesign
+- no SSM-based deployment path
+- no infrastructure recreation for normal code delivery
 
 When running manual deployment commands from your local terminal, the examples
 in the deployment guide use this local SSH key path:
@@ -134,7 +144,7 @@ The complete academic delivery now follows this order:
 3. bootstrap the backend and frontend EC2 instances with the existing repo scripts
 4. download and initialize the Chinook PostgreSQL database under `infra/db`
 5. deploy the backend and frontend application
-6. use GitHub Actions for future CI/CD updates after tests pass
+6. use GitHub Actions for future CI/CD updates after tests pass, with the frontend host acting as the bastion for backend deployment
 
 This separation is intentional:
 
@@ -143,6 +153,27 @@ This separation is intentional:
 - the DB initialization layer loads the Chinook database
 - the deploy scripts publish the application
 - GitHub Actions handles ongoing delivery, not infrastructure creation on every push
+
+## CI/CD Model
+
+The final CI/CD flow is:
+
+- `backend-test` runs on a GitHub-hosted `ubuntu-latest` runner
+- `frontend-test-build` runs on a GitHub-hosted `ubuntu-latest` runner
+- `deploy` runs on a GitHub-hosted `ubuntu-latest` runner
+- the runner deploys directly to `FRONTEND_HOST`
+- the runner deploys to the backend using `ssh -J` or `ProxyJump` through `FRONTEND_HOST` and the backend private IP
+- the private SSH key stays only on the GitHub-hosted runner and is not copied to the frontend EC2
+- the final smoke test still validates the public `/api/health` path through Nginx
+
+Required GitHub repository secrets after this change:
+
+- `SSH_PRIVATE_KEY_B64`
+- `SSH_USER`
+- `FRONTEND_HOST`
+- `BACKEND_PRIVATE_IP`
+- `FRONTEND_SERVER_NAME`
+- `FRONTEND_BASE_URL`
 
 For the complete deployment procedure, see
 [docs/deployment.md](docs/deployment.md).

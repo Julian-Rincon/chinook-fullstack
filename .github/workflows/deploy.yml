@@ -6,8 +6,6 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Only allow one production deployment workflow per branch at a time.
-  # This prevents two pushes from racing and deploying out of order.
   group: chinook-production-${{ github.ref }}
   cancel-in-progress: true
 
@@ -84,99 +82,79 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      - name: Prepare SSH key and known hosts
+      - name: Prepare SSH key, config, and known hosts
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
 
-          # The private key is stored base64-encoded in GitHub secrets so the
-          # original line breaks are preserved safely.
           printf '%s' "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # Try to pre-populate known_hosts, but do not fail the whole workflow
-          # if a host-key scan is temporarily unavailable from the runner.
-          ssh-keyscan -H "${{ secrets.BACKEND_HOST }}" >> ~/.ssh/known_hosts || true
+          cat > ~/.ssh/config <<EOF
+          Host frontend-target
+            HostName ${{ secrets.FRONTEND_HOST }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+            ServerAliveInterval 30
+
+          Host backend-target
+            HostName ${{ secrets.BACKEND_PRIVATE_IP }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/id_ed25519
+            IdentitiesOnly yes
+            ProxyJump frontend-target
+            StrictHostKeyChecking accept-new
+            ServerAliveInterval 30
+          EOF
+          chmod 600 ~/.ssh/config
+
           ssh-keyscan -H "${{ secrets.FRONTEND_HOST }}" >> ~/.ssh/known_hosts || true
 
-      - name: "Temporary Diagnostics: Hosted Runner Reachability"
-        shell: bash
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          echo "::group::temporary-diag backend"
-          echo -n "backend_dns="
-          getent ahostsv4 "${{ secrets.BACKEND_HOST }}" | awk '{print $1}' | sort -u | paste -sd ',' - || true
-          if timeout 5 bash -c "</dev/tcp/${{ secrets.BACKEND_HOST }}/22" >/dev/null 2>&1; then
-            echo "backend_tcp22=reachable"
-          else
-            echo "backend_tcp22=unreachable"
-          fi
-          echo "::endgroup::"
-
-          echo "::group::temporary-diag frontend"
-          echo -n "frontend_dns="
-          getent ahostsv4 "${{ secrets.FRONTEND_HOST }}" | awk '{print $1}' | sort -u | paste -sd ',' - || true
-          if timeout 5 bash -c "</dev/tcp/${{ secrets.FRONTEND_HOST }}/22" >/dev/null 2>&1; then
-            echo "frontend_tcp22=reachable"
-          else
-            echo "frontend_tcp22=unreachable"
-          fi
-          echo "::endgroup::"
-
-      - name: Upload backend app and repo-managed scripts
+      - name: Validate SSH connectivity
         shell: bash
         run: |
           set -euo pipefail
-          # Copy the backend source and the infra folder directly from the repo.
-          # The deployment scripts live in the repository, not on the server.
-          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
-            backend/ "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}:/tmp/chinook/backend/"
-          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
-            infra/ "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}:/tmp/chinook/infra/"
+          ssh frontend-target "echo frontend-ok"
+          ssh backend-target "echo backend-ok"
+
+      - name: Upload backend app and repo-managed scripts through frontend jump host
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -az --delete -e "ssh" backend/ backend-target:/tmp/chinook/backend/
+          rsync -az --delete -e "ssh" infra/ backend-target:/tmp/chinook/infra/
 
       - name: Upload frontend artifact and repo-managed scripts
         shell: bash
         run: |
           set -euo pipefail
-          # Copy the built frontend artifact plus the infra folder to the
-          # frontend EC2. Nginx will serve the artifact from /var/www/chinook.
-          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
-            frontend/dist/ "${{ secrets.SSH_USER }}@${{ secrets.FRONTEND_HOST }}:/tmp/chinook/frontend-dist/"
-          rsync -az --delete -e "ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519" \
-            infra/ "${{ secrets.SSH_USER }}@${{ secrets.FRONTEND_HOST }}:/tmp/chinook/infra/"
+          rsync -az --delete -e "ssh" frontend/dist/ frontend-target:/tmp/chinook/frontend-dist/
+          rsync -az --delete -e "ssh" infra/ frontend-target:/tmp/chinook/infra/
 
-      - name: Deploy backend
+      - name: Deploy backend through frontend jump host
         shell: bash
         run: |
           set -euo pipefail
-          # Run the backend deployment script that came from this repository.
-          # No /usr/local/bin server-side script is assumed.
-          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}" \
-            "sudo /bin/bash /tmp/chinook/infra/scripts/deploy_backend.sh"
+          ssh backend-target "sudo /bin/bash /tmp/chinook/infra/scripts/deploy_backend.sh"
 
       - name: Deploy frontend
         shell: bash
         run: |
           set -euo pipefail
-          # The frontend deploy script renders the Nginx config using the
-          # backend private URL and the public frontend server name.
-          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.FRONTEND_HOST }}" \
-            "sudo BACKEND_UPSTREAM='${{ secrets.BACKEND_UPSTREAM }}' SERVER_NAME='${{ secrets.FRONTEND_SERVER_NAME }}' /bin/bash /tmp/chinook/infra/scripts/deploy_frontend.sh"
+          ssh frontend-target \
+            "sudo BACKEND_UPSTREAM='http://${{ secrets.BACKEND_PRIVATE_IP }}:8000' SERVER_NAME='${{ secrets.FRONTEND_SERVER_NAME }}' /bin/bash /tmp/chinook/infra/scripts/deploy_frontend.sh"
 
-      - name: Smoke test backend health from backend host
+      - name: Smoke test backend health through frontend jump host
         shell: bash
         run: |
           set -euo pipefail
-          # Validate the backend service directly on its native FastAPI route.
-          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_ed25519 "${{ secrets.SSH_USER }}@${{ secrets.BACKEND_HOST }}" \
-            "bash /tmp/chinook/infra/scripts/smoke_test.sh http://127.0.0.1:8000 /health"
+          ssh backend-target "bash /tmp/chinook/infra/scripts/smoke_test.sh http://127.0.0.1:8000 /health"
 
       - name: Smoke test public frontend path
         shell: bash
         run: |
           set -euo pipefail
-          # Validate the final user-facing path through Nginx, which exposes the
-          # backend health route under /api/health.
           bash infra/scripts/smoke_test.sh "${{ secrets.FRONTEND_BASE_URL }}" /api/health
