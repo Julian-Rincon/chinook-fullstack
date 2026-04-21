@@ -1,0 +1,33 @@
+name: Parcial 2 — ETL Unit Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  etl-tests:
+    name: Run ETL Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest pytest-cov
+
+      - name: Run ETL unit tests
+        run: |
+          pytest tests/test_etl.py -v --tb=short
+
+      - name: Generate coverage report
+        run: |
+          pytest tests/test_etl.py --cov=tests --cov-report=term-missing
