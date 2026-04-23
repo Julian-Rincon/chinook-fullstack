@@ -1,7 +1,7 @@
 # Chinook Fullstack — Coursework Project 1 & 2
 
 **Universidad Sergio Arboleda | Big Data and Data Engineering**
-**Professor:** Oscar Andrés Arias M.
+**Professor:** Camilo Enrique Rodriguez Torres.
 **Student:** Julian Esteban Rincón Rodríguez
 
 ---
