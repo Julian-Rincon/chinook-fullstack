@@ -17,6 +17,8 @@ coverage/
 
 # Terraform
 .terraform/
+*.tfplan
+tfplan
 *.tfstate
 *.tfstate.*
 *.tfvars
@@ -26,3 +28,6 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Local assistant/tooling scratch files
+.codex-tmp/

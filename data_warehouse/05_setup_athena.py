@@ -1,5 +1,5 @@
 """
-fase6_athena.py
+05_setup_athena.py
 Create Athena external tables and run the required analytical queries.
 """
 from __future__ import annotations

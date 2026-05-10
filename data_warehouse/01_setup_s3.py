@@ -1,5 +1,5 @@
 """
-fase1_setup_s3.py
+01_setup_s3.py
 Create the S3 storage layer for the Chinook Data Warehouse.
 
 The script is idempotent: existing buckets are reused and the expected prefixes

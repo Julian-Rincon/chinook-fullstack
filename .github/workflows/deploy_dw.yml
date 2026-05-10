@@ -1,4 +1,4 @@
-name: Parcial 2 — ETL Unit Tests
+name: Data Warehouse ETL Tests
 
 on:
   push:
@@ -13,16 +13,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install test dependencies
         run: |
-          pip install pytest pytest-cov
+          python -m pip install --upgrade pip
+          pip install -r data_warehouse/requirements.txt
 
       - name: Run ETL unit tests
         run: |

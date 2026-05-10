@@ -10,8 +10,8 @@ account using simple, auditable infrastructure:
 - 1 private Amazon RDS PostgreSQL instance
 - GitHub Actions on GitHub-hosted runners for CI/CD
 
-The design is intentionally straightforward so it can be defended clearly in an
-academic presentation.
+The design is intentionally straightforward so it can be audited, reproduced,
+and explained clearly in a portfolio or technical interview.
 
 ## 2. Project Architecture
 
@@ -88,10 +88,10 @@ Terraform provisions these resources:
 7. backend EC2 instance
 8. PostgreSQL RDS instance with `publicly_accessible = false`
 
-The current Terraform layout does not create a NAT gateway because the chosen
-academic design keeps the backend EC2 reachable for SSH and package updates in a
-public subnet while still restricting application traffic with security groups.
-The database remains private in private subnets.
+The current Terraform layout does not create a NAT gateway. The backend EC2 is
+kept reachable for SSH and package updates in a public subnet, while application
+traffic is still restricted with security groups. The database remains private
+in private subnets.
 
 ## 5. Recommended Security Groups
 
@@ -245,8 +245,8 @@ From your local terminal, verify access to both servers using your local key
 file. Replace `BACKEND_IP` and `FRONTEND_IP` with the real public IPs:
 
 ```powershell
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@BACKEND_IP
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@FRONTEND_IP
+ssh -i ~/.ssh/chinook.pem ubuntu@BACKEND_IP
+ssh -i ~/.ssh/chinook.pem ubuntu@FRONTEND_IP
 ```
 
 ### Step 4: Copy Infrastructure Files To The Servers
@@ -254,8 +254,8 @@ ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@FRONTEND_IP
 Before bootstrap, copy the repo-managed `infra/` directory to each server:
 
 ```powershell
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@BACKEND_IP:/tmp/chinook/infra/
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" infra/ ubuntu@BACKEND_IP:/tmp/chinook/infra/
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
 ```
 
 ### Step 5: Prepare The Backend Server
@@ -263,7 +263,7 @@ rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" i
 Connect to the backend EC2 and run:
 
 ```powershell
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@BACKEND_IP
+ssh -i ~/.ssh/chinook.pem ubuntu@BACKEND_IP
 sudo bash /tmp/chinook/infra/scripts/bootstrap_backend_server.sh
 ```
 
@@ -280,7 +280,7 @@ This script:
 Connect to the frontend EC2 and run:
 
 ```powershell
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@FRONTEND_IP
+ssh -i ~/.ssh/chinook.pem ubuntu@FRONTEND_IP
 sudo bash /tmp/chinook/infra/scripts/bootstrap_frontend_server.sh
 ```
 
@@ -296,7 +296,7 @@ This script:
 On the backend EC2, create:
 
 ```powershell
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@BACKEND_IP
+ssh -i ~/.ssh/chinook.pem ubuntu@BACKEND_IP
 sudo nano /etc/chinook/backend.env
 ```
 
@@ -360,9 +360,9 @@ Backend:
 - run:
 
 ```powershell
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" backend/ ubuntu@BACKEND_IP:/tmp/chinook/backend/
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@BACKEND_IP:/tmp/chinook/infra/
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@BACKEND_IP
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" backend/ ubuntu@BACKEND_IP:/tmp/chinook/backend/
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" infra/ ubuntu@BACKEND_IP:/tmp/chinook/infra/
+ssh -i ~/.ssh/chinook.pem ubuntu@BACKEND_IP
 sudo bash /tmp/chinook/infra/scripts/deploy_backend.sh
 ```
 
@@ -373,9 +373,9 @@ Frontend:
 - run:
 
 ```powershell
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" frontend/dist/ ubuntu@FRONTEND_IP:/tmp/chinook/frontend-dist/
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@FRONTEND_IP
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" frontend/dist/ ubuntu@FRONTEND_IP:/tmp/chinook/frontend-dist/
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
+ssh -i ~/.ssh/chinook.pem ubuntu@FRONTEND_IP
 sudo BACKEND_UPSTREAM=http://10.0.2.15:8000 SERVER_NAME=app.example.com \
   bash /tmp/chinook/infra/scripts/deploy_frontend.sh
 ```
@@ -425,18 +425,18 @@ If deploying manually:
 Backend:
 
 ```powershell
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" backend/ ubuntu@BACKEND_IP:/tmp/chinook/backend/
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@BACKEND_IP:/tmp/chinook/infra/
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@BACKEND_IP
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" backend/ ubuntu@BACKEND_IP:/tmp/chinook/backend/
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" infra/ ubuntu@BACKEND_IP:/tmp/chinook/infra/
+ssh -i ~/.ssh/chinook.pem ubuntu@BACKEND_IP
 sudo bash /tmp/chinook/infra/scripts/deploy_backend.sh
 ```
 
 Frontend:
 
 ```powershell
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" frontend/dist/ ubuntu@FRONTEND_IP:/tmp/chinook/frontend-dist/
-rsync -avz -e "ssh -i \"C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem\"" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
-ssh -i "C:\Users\jrinc\Desktop\Big Data\parcial2\vockey.pem" ubuntu@FRONTEND_IP
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" frontend/dist/ ubuntu@FRONTEND_IP:/tmp/chinook/frontend-dist/
+rsync -avz -e "ssh -i ~/.ssh/chinook.pem" infra/ ubuntu@FRONTEND_IP:/tmp/chinook/infra/
+ssh -i ~/.ssh/chinook.pem ubuntu@FRONTEND_IP
 sudo BACKEND_UPSTREAM=http://10.0.2.15:8000 SERVER_NAME=app.example.com \
   bash /tmp/chinook/infra/scripts/deploy_frontend.sh
 ```

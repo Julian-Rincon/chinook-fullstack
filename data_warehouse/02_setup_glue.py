@@ -1,5 +1,5 @@
 """
-fase2_glue_setup.py
+02_setup_glue.py
 Create the Glue Data Catalog database and JDBC connection used by the ETL jobs.
 
 Required environment variables:
@@ -46,7 +46,7 @@ def ensure_database(glue_client) -> None:
         glue_client.create_database(
             DatabaseInput={
                 "Name": GLUE_DATABASE,
-                "Description": "Chinook star-schema Data Warehouse for Parcial 2",
+                "Description": "Chinook star-schema Data Warehouse",
             }
         )
         print(f"Created Glue database: {GLUE_DATABASE}")

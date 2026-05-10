@@ -1,6 +1,6 @@
 """
-inspector.py
-Quick checks for the Parcial 2 Data Warehouse resources.
+inspect_dw.py
+Quick checks for the Chinook Data Warehouse resources.
 """
 from __future__ import annotations
 

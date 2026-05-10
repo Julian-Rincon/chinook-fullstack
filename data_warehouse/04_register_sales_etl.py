@@ -1,9 +1,9 @@
 """
-fase4y5_final.py
+04_register_sales_etl.py
 Upload and register the Glue ETL jobs for DimCustomer, DimTrack and FactSales.
 
 The jobs read Chinook PostgreSQL through the Glue JDBC connection created in
-fase2_glue_setup.py and write Parquet datasets to S3.
+02_setup_glue.py and write Parquet datasets to S3.
 """
 from __future__ import annotations
 
@@ -193,7 +193,7 @@ def ensure_job(glue_client, job_name: str, script_location: str, role_arn: str) 
     job_input = {
         "Name": job_name,
         "Role": role_arn,
-        "Description": f"Parcial 2 Chinook DW job: {job_name}",
+        "Description": f"Chinook Data Warehouse ETL job: {job_name}",
         "Command": {
             "Name": "glueetl",
             "ScriptLocation": script_location,

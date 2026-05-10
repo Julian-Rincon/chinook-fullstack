@@ -1,5 +1,5 @@
 """
-fase3_etl_dim_date.py
+03_load_dim_date.py
 Generate DimDate for the Chinook Data Warehouse.
 
 This script can run as an AWS Glue PySpark job. When executed locally without
